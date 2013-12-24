@@ -51,4 +51,12 @@ public class LookupTable implements Serializable{
 		}
 		return null;
 	}
+
+	public List<Record> getTable() {
+		return table==null? new ArrayList<Record>():table;
+	}
+
+	public void setTable(List<Record> table) {
+		this.table = table;
+	}
 }

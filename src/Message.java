@@ -8,6 +8,9 @@ public class Message implements Serializable{
 	
 	private String username;
 	private String message;
+	private byte[] encondedPublicKey;
+	private byte[] initializationVector;
+	
 	
 	public Message(String username, String message) {
 		super();
@@ -26,6 +29,20 @@ public class Message implements Serializable{
 	}
 	public void setMessage(String message) {
 		this.message = message;
+	}
+	public byte[] getEncondedPublicKey() {
+		return encondedPublicKey;
+	}
+
+	public void setEncondedPublicKey(byte[] encondedPublicKey) {
+		this.encondedPublicKey = encondedPublicKey;
+	}
+	public byte[] getInitializationVector() {
+		return initializationVector;
+	}
+
+	public void setInitializationVector(byte[] initializationVector) {
+		this.initializationVector = initializationVector;
 	}
 
 }
