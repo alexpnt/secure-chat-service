@@ -214,7 +214,7 @@ public class ChatClient{
 				System.out.println("Retrieving your session key ...");
 				String keyFilename =KEY_DIR+username+"_key";
 			    String keyFilenameEncrypted =KEY_DIR+username+"_key_DES";
-				encryptSerializedKey(pass1, keyFilename, keyFilenameEncrypted);
+				decryptSerializedKey(pass1, keyFilename, keyFilenameEncrypted);
 				SessionKey sessionKey=unserializeSessionKey(keyFilename);
 				
 				System.out.println("Success!\nCreating the CipherStreams to be used with server...");
@@ -288,10 +288,11 @@ public class ChatClient{
 			}
 			finally{
 				input.close();
+				f.delete();
 			}
 		}
 		catch(Throwable e){
-			System.out.println("An error has ocurred serializing key to disk: "+e.getMessage());
+			System.out.println("An error has ocurred unserializing key to disk: "+e.getMessage());
 			e.printStackTrace();
 		}
 		return sessionKey;
@@ -307,6 +308,7 @@ public class ChatClient{
 			FileInputStream fis = new FileInputStream(keyFilename);
 			FileOutputStream fos = new FileOutputStream(keyFilenameEncrypted);
 			encrypt(password, fis, fos);
+			f.delete();
 
 		} catch (Throwable e) {
 			e.printStackTrace();

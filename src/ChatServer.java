@@ -179,6 +179,7 @@ public class ChatServer{
 			FileInputStream fis = new FileInputStream(TABLE_FILE);
 			FileOutputStream fos = new FileOutputStream(ENCRYPTED_TABLE_FILE);
 			encrypt(smartcard, fis, fos);
+			f.delete();
 
 		} catch (Throwable e) {
 			e.printStackTrace();
