@@ -15,6 +15,8 @@ public class ChatClient{
 	private static ObjectOutputStream out;
 	private static String KEY_DIR="../data/";						//location of the secret key
 	
+	private static Boolean DEBUG=false;
+	
 	/*
 	 * 
 	 * Diffie-Hellman Parameters for 1024 bits Modulus (1024-bit prime modulus P, base G)
@@ -216,7 +218,21 @@ public class ChatClient{
 			    String keyFilenameEncrypted =KEY_DIR+username+"_key_DES";
 				decryptSerializedKey(pass1, keyFilename, keyFilenameEncrypted);
 				SessionKey sessionKey=unserializeSessionKey(keyFilename);
-				
+				if(sessionKey==null){
+					System.out.println("An error has ocurred while retrieving your session key. Possible causes:\n"
+							+ "\t->You entered a wrong password :/.\n"
+							+ "\t->You are an intruder >:).");
+					File f = new File(keyFilename);
+					f.delete();
+//					syn.setMessage("FAIL");
+//					out.writeObject(syn);
+//					out.reset();
+//					out.flush();
+					return;
+				}
+//				out.writeObject(syn);
+//				out.reset();
+//				out.flush();
 				System.out.println("Success!\nCreating the CipherStreams to be used with server...");
 				
 				try{
@@ -241,11 +257,28 @@ public class ChatClient{
 			       ex.printStackTrace();
 				 }
 			}
+			
+			Input inputBuffer=new Input();
+			inputBuffer.start();
+			
+			String msg = "";
+		    InputStreamReader inputStream = new InputStreamReader(System.in);
+		    BufferedReader reader = new BufferedReader(inputStream);
+		    Message m;
+			while(true){
+			    msg=reader.readLine();
+			    m=new Message(username,msg);
+			    cipherOut.writeObject(m);
+			    cipherOut.reset();
+			    cipherOut.flush();
+			    System.out.println();
+			}
+			
 		}
 		catch (IOException e) {
 			System.out.println("An error has ocurred: "+e.getMessage());
 		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
+			if(DEBUG)e.printStackTrace();
 		}
 	}
 	
@@ -267,7 +300,7 @@ public class ChatClient{
 		}
 		catch(IOException e){
 			System.out.println("An error has ocurred serializing key to disk: "+e.getMessage());
-			e.printStackTrace();
+			if(DEBUG)e.printStackTrace();
 			return false;
 		}
 		return true;
@@ -292,8 +325,10 @@ public class ChatClient{
 			}
 		}
 		catch(Throwable e){
-			System.out.println("An error has ocurred unserializing key to disk: "+e.getMessage());
-			e.printStackTrace();
+			if(DEBUG){
+				System.out.println("An error has ocurred unserializing key to memory: "+e.getMessage());
+				e.printStackTrace();
+			}
 		}
 		return sessionKey;
 	}
@@ -311,7 +346,7 @@ public class ChatClient{
 			f.delete();
 
 		} catch (Throwable e) {
-			e.printStackTrace();
+			if(DEBUG)e.printStackTrace();
 		}
 		return true;
 	}
@@ -327,7 +362,7 @@ public class ChatClient{
 			FileOutputStream fos = new FileOutputStream(keyFilename);
 			decrypt(password, fis, fos);
 		} catch (Throwable e) {
-			e.printStackTrace();
+			if(DEBUG)e.printStackTrace();
 		}
 		return true;
 	}
@@ -365,5 +400,27 @@ public class ChatClient{
 		os.flush();
 		os.close();
 		is.close();
+	}
+	
+	static class Input extends Thread {
+		Message message;
+		Input(){
+			message=new Message("","");
+		}
+		
+		public void run(){
+			try{
+				while(true){
+					message=(Message)cipherIn.readObject();
+					System.out.println("\nNew message from "+message.getUsername()+": "+message.getMessage()+"\n");
+				}
+			}
+			catch (IOException e) {
+				System.out.println("Disconnected from server ...");
+				System.exit(0);
+			}
+			catch (ClassNotFoundException e) {
+			}
+		}
 	}
 }

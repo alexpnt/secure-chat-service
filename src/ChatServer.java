@@ -20,6 +20,10 @@ public class ChatServer{
 	private static List <ObjectInputStream> objectInPool = new ArrayList<ObjectInputStream>();				//Insecure channels
 	private static List <ObjectOutputStream> objectOutPool = new ArrayList<ObjectOutputStream>();
 	
+	private static List <String> onlineUsers= new ArrayList<String>();
+	
+	private static Boolean DEBUG=false;
+	
 	private static LookupTable table;
 	
 	/*
@@ -326,11 +330,14 @@ public class ChatServer{
 					    cipherOut.flush();
 					    cipherIn = new ObjectInputStream(new CipherInputStream(in, decrypter));
 					    
-					    //add these channels to the list of known connections
-					    cipherInPool.add(cipherIn);
-					    cipherOutPool.add(cipherOut);
-					    objectInPool.add(in);
-					    objectOutPool.add(out);
+					    //add these channels to the list of known connections, must be synchronized
+					    synchronized(this) {
+					    	cipherInPool.add(cipherIn);
+						    cipherOutPool.add(cipherOut);
+						    objectInPool.add(in);
+						    objectOutPool.add(out);
+						    onlineUsers.add(username);
+					    }
 					    
 					    //add a new table entry for future connections
 					    SessionKey key=new SessionKey(initializationVector,sessionKey);
@@ -355,8 +362,16 @@ public class ChatServer{
 						syn.setMessage("KNOWN");
 						out.writeObject(syn);
 						out.reset();
+						out.flush();
 						
 						System.out.println("Known client detected... "+username);
+						
+//						syn=(Message)in.readObject();
+//						if(syn.getMessage().compareToIgnoreCase("FAIL")==0){	//log and close invalid connection
+//							System.out.println("WARNING: client "+username+" attempted to login but failed!");
+//							clientSocket.close();
+//							return;
+//						}
 						System.out.println("Creating the CipherStreams to be used with client: "+username);
 						
 						byte[] initializationVector=clientRecord.getSessionKey().getSpecification();
@@ -374,11 +389,14 @@ public class ChatServer{
 					    cipherOut.flush();
 					    cipherIn = new ObjectInputStream(new CipherInputStream(in, decrypter));
 					    
-					    //add these channels to the list of known connections
-					    cipherInPool.add(cipherIn);
-					    cipherOutPool.add(cipherOut);
-					    objectInPool.add(in);
-					    objectOutPool.add(out);
+					    //add these channels to the list of known connections, must be synchronized
+					    synchronized(this) {
+					    	cipherInPool.add(cipherIn);
+						    cipherOutPool.add(cipherOut);
+						    objectInPool.add(in);
+						    objectOutPool.add(out);
+						    onlineUsers.add(username);
+					    }
 					    
 					    //send a success message
 					    syn.setMessage("Successfully Established a Secure Connection with server");
@@ -391,11 +409,43 @@ public class ChatServer{
 					}
 					catch(GeneralSecurityException ex){
 						System.out.println("An error has ocurred ...\nDetails: "+ex.getMessage());
-					    ex.printStackTrace();
+					    if(DEBUG)ex.printStackTrace();
+					}
+				}
+				
+				
+				//listen for incoming messages and echoes them
+				Message message;
+				while(true){
+					message=(Message)cipherIn.readObject();
+					for(int i=0;i<cipherOutPool.size();i++){
+						ObjectOutputStream encryptedChannel=cipherOutPool.get(i);
+						if(DEBUG)System.out.println("Forwarding message to "+onlineUsers.get(i));
+						try{
+							if(onlineUsers.get(i).compareToIgnoreCase(message.getUsername())!=0){	//avoid ping-pong
+								encryptedChannel.writeObject(message);
+								encryptedChannel.reset();
+								encryptedChannel.flush();
+							}
+						}
+						catch(IOException e){ //remove offline user
+							if(username==null) username="?";
+							System.out.println("Client "+username+" was disconnected. Details: "+ e.getMessage());
+							if(DEBUG)e.printStackTrace();
+							synchronized(this) {
+								cipherInPool.remove(i);
+							    cipherOutPool.remove(i);
+							    objectInPool.remove(i);
+							    objectOutPool.remove(i);
+							    onlineUsers.remove(i);
+							}
+							i--;
+						}
 					}
 				}
 			}
-			catch(IOException e){
+			catch(IOException e){ //remove offline user
+				
 			}
 			catch (ClassNotFoundException e) {
 			}
