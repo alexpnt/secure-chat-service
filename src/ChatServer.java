@@ -370,8 +370,13 @@ public class ChatServer{
 //						if(syn.getMessage().compareToIgnoreCase("FAIL")==0){	//log and close invalid connection
 //							System.out.println("WARNING: client "+username+" attempted to login but failed!");
 //							clientSocket.close();
+						
+						//a ver se isto dá bode
+						
 //							return;
 //						}
+						
+						
 						System.out.println("Creating the CipherStreams to be used with client: "+username);
 						
 						byte[] initializationVector=clientRecord.getSessionKey().getSpecification();
