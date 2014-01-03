@@ -1,10 +1,7 @@
 import java.io.*;
 import java.net.*;
-import java.math.*;
 import java.security.*;
-import java.security.spec.*;
 import java.util.Scanner;
-
 import javax.crypto.*;
 import javax.crypto.spec.*;
 
@@ -13,25 +10,22 @@ public class ChatClient{
 	private static ObjectOutputStream cipherOut;
 	private static ObjectInputStream in;;						//insecure channels
 	private static ObjectOutputStream out;
-
 	
 	private static Boolean DEBUG=false;
 	
-	private static String KEY_DIR = "data/"; // location of the secret key
+	private static String KEY_DIR = "../data/"; // location of the secret key
 	public boolean readFromThread=true;
     PipedInputStream pin = null;
     PipedOutputStream pout = null;
 	
-	public ChatClient() {
-		
-	}
+	public ChatClient() {}
 	
 	public static void main(String args[]){
 		ChatClient chatClient=new ChatClient();
-		chatClient.Init();
+		chatClient.Init(args);
 	}
 	
-	public void Init(){
+	public void Init(String args[]){
 
         try {
             pin = new PipedInputStream();
@@ -47,7 +41,7 @@ public class ChatClient{
 		System.out.println("\nUsername:");
 		username=scan.nextLine();
 		//Starts the thread responsible for the connection
-		Input inputBuffer=new Input(username,this);
+		Input inputBuffer=new Input(username,this,args);
 		inputBuffer.start();
 		
 		String msg = "";
@@ -68,7 +62,6 @@ public class ChatClient{
 						try {
 							this.wait();
 						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 					}
@@ -90,7 +83,6 @@ public class ChatClient{
 					try {
 						this.wait();
 					} catch (InterruptedException e1) {
-						// TODO Auto-generated catch block
 						e1.printStackTrace();
 					}
 				}
@@ -105,8 +97,6 @@ public class ChatClient{
 
 		try {
 			File f = new File(keyFilename);
-			System.out.println(keyFilename);
-			System.out.println(f.getAbsolutePath());
 			f.createNewFile();
 
 			OutputStream file = new FileOutputStream(keyFilename);
@@ -132,7 +122,6 @@ public class ChatClient{
 
 		try {
 			File f = new File(keyFilename);
-			System.out.println(keyFilename);
 			f.createNewFile();
 
 			InputStream file = new FileInputStream(keyFilename);
@@ -146,9 +135,7 @@ public class ChatClient{
 			}
 		} catch (Throwable e) {
 			if (DEBUG) {
-				System.out
-						.println("An error has ocurred unserializing key to memory: "
-								+ e.getMessage());
+				System.out.println("An error has ocurred unserializing key to memory: " + e.getMessage());
 				e.printStackTrace();
 			}
 		}
@@ -161,7 +148,6 @@ public class ChatClient{
 		try {
 			File f = new File(keyFilename);
 			File fe = new File(keyFilenameEncrypted);
-			System.out.println(keyFilename);
 			f.createNewFile();
 			fe.createNewFile();
 
@@ -184,7 +170,6 @@ public class ChatClient{
 			File f = new File(keyFilename);
 			File fe = new File(keyFilenameEncrypted);
 
-			System.out.println(f.getAbsolutePath());
 			f.createNewFile();
 			fe.createNewFile();
 
@@ -243,24 +228,29 @@ public class ChatClient{
 		Message message;
 		String username;
 		ChatClient chatClient;
-		Input(String username, ChatClient chatClient){
+		String args[];
+		
+		Input(String username, ChatClient chatClient,String args[]){
 			message=new Message("","");
 			this.username=username;
 			this.chatClient=chatClient;
+			this.args=args;
 		}
 		
 		public void run(){
 			while(true){
 				Socket socket = null;
-				int serverPort=8000;	
-				String host="127.0.0.1";
+				int serverPort;	
+				String host;
 
-		//		if (args.length != 2){
-		//            System.out.println("Usage: java ChatClient host port");
-		//            return;
-		//		}
-		//		host=args[0];
-		//		serverPort = Integer.parseInt(args[1]);
+				try{
+					host=args[0];
+					serverPort = Integer.parseInt(args[1]);
+				}catch(Exception e){
+					host="127.0.0.1";
+					serverPort = 8000;
+				}
+				
 				System.out.println("Trying to connect to "+host+", port "+serverPort+".");
 				
 				try{
@@ -283,7 +273,6 @@ public class ChatClient{
 					syn=(Message)in.readObject();				//receive the server reply
 					message=syn.getMessage();					
 
-					Scanner scan=new Scanner(System.in);
 					if(message.compareToIgnoreCase("NEW")==0){			
 						DiffieHellman df=new DiffieHellman();
 						df.createNewKey(username, true, in, out);
@@ -309,23 +298,23 @@ public class ChatClient{
 						Console cons;
 						
 						chatClient.readFromThread=true;
-						byte[]temp=new byte[100];
-						pin.read(temp);
-						pass1=temp.toString();
-		//				do{
-		//				System.out.println("\n[Both passwords must match and be at least 8 characters]");
-		//				if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
-		//					pass1=new String(passwd);
-		//				    java.util.Arrays.fill(passwd,' ');
-		//				}
-		//				
-		//				System.out.print("Please retype it:\n");
-		//				if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
-		//					pass2=new String(passwd);
-		//				    java.util.Arrays.fill(passwd,' ');
-		//				}
-		//				
-		//			}while(pass1.compareTo(pass2)!=0 || pass1.length()<8);
+						//byte[]temp=new byte[100];
+						//pin.read(temp);
+						//pass1=temp.toString();
+						do{
+							System.out.println("\n[Both passwords must match and be at least 8 characters]");
+							if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
+								pass1=new String(passwd);
+							    java.util.Arrays.fill(passwd,' ');
+							}
+							
+							System.out.print("Please retype it:\n");
+							if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
+								pass2=new String(passwd);
+							    java.util.Arrays.fill(passwd,' ');
+							}
+						
+						}while(pass1.compareTo(pass2)!=0 || pass1.length()<8);
 		
 						encryptSerializedKey(pass1, keyFilename, keyFilenameEncrypted);
 		
@@ -341,23 +330,23 @@ public class ChatClient{
 						Console cons;
 						
 						chatClient.readFromThread=true;
-						byte[]temp=new byte[100];
-						pin.read(temp);
-						pass1=temp.toString();
-		//				do{
-		//					System.out.println("\n[Both passwords must match and be at least 8 characters]");
-		//					if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
-		//						pass1=new String(passwd);
-		//					    java.util.Arrays.fill(passwd,' ');
-		//					}
-		//					
-		//					System.out.print("Please retype it:\n");
-		//					if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
-		//						pass2=new String(passwd);
-		//					    java.util.Arrays.fill(passwd,' ');
-		//					}
-		//					
-		//				}while(pass1.compareTo(pass2)!=0 || pass1.length()<8);
+						//byte[]temp=new byte[100];
+						//pin.read(temp);
+						//pass1=temp.toString();
+						do{
+							System.out.println("\n[Both passwords must match and be at least 8 characters]");
+							if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
+								pass1=new String(passwd);
+							    java.util.Arrays.fill(passwd,' ');
+							}
+							
+							System.out.print("Please retype it:\n");
+							if ((cons = System.console()) != null && (passwd = cons.readPassword("[%s]", "Password:")) != null) {
+								pass2=new String(passwd);
+							    java.util.Arrays.fill(passwd,' ');
+							}
+							
+						}while(pass1.compareTo(pass2)!=0 || pass1.length()<8);
 						
 						System.out.println("Retrieving your session key ...");
 						String keyFilename =KEY_DIR+username+"_key";
@@ -371,7 +360,7 @@ public class ChatClient{
 							File f = new File(keyFilename);
 							f.delete();
 		
-							return;
+							System.exit(1);
 						}
 		
 						System.out.println("Success!\nCreating the CipherStreams to be used with server...");
@@ -426,7 +415,6 @@ public class ChatClient{
 					try {
 						Thread.sleep(5000);
 					} catch (InterruptedException e1) {
-						// TODO Auto-generated catch block
 						e1.printStackTrace();
 					}
 				} catch (ClassNotFoundException e) {

@@ -1,10 +1,7 @@
 import java.io.*;
-import java.net.*;
 import java.math.*;
 import java.security.*;
 import java.security.spec.*;
-import java.util.Scanner;
-
 import javax.crypto.*;
 import javax.crypto.spec.*;
 
@@ -17,14 +14,11 @@ public class DiffieHellman {
 	private SecretKey sessionKey;
 	byte[] initializationVector;
 
-	DiffieHellman() {
-
-	}
+	DiffieHellman(){}
 
 	/*
 	 * 
-	 * Diffie-Hellman Parameters for 1024 bits Modulus (1024-bit prime modulus
-	 * P, base G)
+	 * Diffie-Hellman Parameters for 1024 bits Modulus (1024-bit prime modulus P, base G)
 	 */
 	private final byte SKIP_1024_MODULUS_BYTES[] = { (byte) 0xF4, (byte) 0x88,
 			(byte) 0xFD, (byte) 0x58, (byte) 0x4E, (byte) 0x49, (byte) 0xDB,
@@ -54,11 +48,9 @@ public class DiffieHellman {
 			(byte) 0xC3, (byte) 0x55, (byte) 0xE9, (byte) 0x2F, (byte) 0x78,
 			(byte) 0xC7 };
 
-	private final BigInteger P_MODULUS = new BigInteger(1,
-			SKIP_1024_MODULUS_BYTES);
+	private final BigInteger P_MODULUS = new BigInteger(1,SKIP_1024_MODULUS_BYTES);
 	private final BigInteger G_BASE = BigInteger.valueOf(2);
-	private final DHParameterSpec PARAMETER_SPEC = new DHParameterSpec(
-			P_MODULUS, G_BASE);
+	private final DHParameterSpec PARAMETER_SPEC = new DHParameterSpec(P_MODULUS, G_BASE); 	//just a wrapper
 
 
 

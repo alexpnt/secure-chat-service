@@ -66,8 +66,11 @@ public class Message implements Serializable{
 			if(	Arrays.equals( digest.digest((username+message).getBytes("UTF-8")), messageDigest) ){
 				return true;
 			}
-		} catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
-			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e1){
+			e1.printStackTrace();
+		}
+		catch(UnsupportedEncodingException e2){
+			e2.printStackTrace();
 		}
 		return false;
 	}
@@ -78,9 +81,13 @@ public class Message implements Serializable{
 			digest = MessageDigest.getInstance("MD5");
 			messageDigest=digest.digest((username+message).getBytes("UTF-8"));
 
-		} catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
-			e.printStackTrace();
+		}catch (NoSuchAlgorithmException e1){
+			e1.printStackTrace();
 		}
+		catch(UnsupportedEncodingException e2){
+			e2.printStackTrace();
+		}
+		
 	}
 
 }
