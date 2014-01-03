@@ -11,27 +11,25 @@ import javax.crypto.spec.*;
 
 public class ChatServer{
 	
-	private static final String TABLE_FILE = "../data/LookupTable.ser";
-	private static final String ENCRYPTED_TABLE_FILE = "../data/LookupTable_DES";
 	
-	private static List<ObjectInputStream> cipherInPool = new ArrayList<ObjectInputStream>();				    //Secure channels
-	private static List<ObjectOutputStream> cipherOutPool = new ArrayList<ObjectOutputStream>();
-			
-	private static List <ObjectInputStream> objectInPool = new ArrayList<ObjectInputStream>();				//Insecure channels
-	private static List <ObjectOutputStream> objectOutPool = new ArrayList<ObjectOutputStream>();
+	ChatServer server;
 	
-	private static List <String> onlineUsers= new ArrayList<String>();
 	
-	private static Boolean DEBUG=false;
+	private final String TABLE_FILE = "data/LookupTable.ser";
+	private final String ENCRYPTED_TABLE_FILE = "data/LookupTable_DES";
 	
-	private static LookupTable table;
+	private List <Connection> connections = new ArrayList<Connection>();
+	
+	private Boolean DEBUG=false;
+	
+	private LookupTable table;
 	
 	/*
 	 * 
 	 * Diffie-Hellman Parameters for 1024 bits Modulus (1024-bit prime modulus P, base G)
 	 * 
 	 */
-	private static final byte SKIP_1024_MODULUS_BYTES[] = {
+	private final byte SKIP_1024_MODULUS_BYTES[] = {
 	    (byte)0xF4, (byte)0x88, (byte)0xFD, (byte)0x58,
 	    (byte)0x4E, (byte)0x49, (byte)0xDB, (byte)0xCD,
 	    (byte)0x20, (byte)0xB4, (byte)0x9D, (byte)0xE4,
@@ -65,28 +63,35 @@ public class ChatServer{
 	    (byte)0xA2, (byte)0x5E, (byte)0xC3, (byte)0x55,
 	    (byte)0xE9, (byte)0x2F, (byte)0x78, (byte)0xC7
 	  };
-	private static final BigInteger P_MODULUS = new BigInteger (1,SKIP_1024_MODULUS_BYTES);
-	private static final BigInteger G_BASE = BigInteger.valueOf(2);
-	private static final DHParameterSpec PARAMETER_SPEC = new DHParameterSpec(P_MODULUS,G_BASE);	//just a wrapper
+	private final BigInteger P_MODULUS = new BigInteger (1,SKIP_1024_MODULUS_BYTES);
+	private final BigInteger G_BASE = BigInteger.valueOf(2);
+	private final DHParameterSpec PARAMETER_SPEC = new DHParameterSpec(P_MODULUS,G_BASE);	//just a wrapper
 	
-	public static void main(String args[])
-   	{  	
-		int serverPort;	
-		if (args.length != 1){
-	    	System.out.println("Usage: java ChatServer port");
-	    	return;
-		}
+	
+	public ChatServer() {
+		
+	}
+	
+	public void init(ChatServer server){
+		this.server=server;
+		ExpirationChecker expirationChecker=new ExpirationChecker(server);
+		int serverPort=8000;	
+//		if (args.length != 1){
+//	    	System.out.println("Usage: java ChatServer port");
+//	    	return;
+//		}
+//		serverPort = Integer.parseInt(args[0]);
 		
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				System.out.println("Cleanning up resources and shutting down server:");
 				System.out.println("Closing connections ...");
-				for(int i=0;i<cipherInPool.size();i++){
+				for(Connection con:connections){
 					try{
-						if(cipherInPool.get(i)!=null)cipherInPool.get(i).close();
-						if(cipherOutPool.get(i)!=null)cipherInPool.get(i).close();
-						if(objectInPool.get(i)!=null)cipherInPool.get(i).close();
-						if(objectOutPool.get(i)!=null)cipherInPool.get(i).close();
+						if(con.in!=null) con.in.close();
+						if(con.out!=null)con.out.close();
+						if(con.cipherIn!=null)con.cipherIn.close();
+						if(con.cipherOut!=null)con.cipherOut.close();
 					}
 					catch(IOException e){}
 				}
@@ -97,7 +102,7 @@ public class ChatServer{
 			}
 		});
 		
-		serverPort = Integer.parseInt(args[0]);
+		
 		try {
 			System.out.println("Starting server...");
 			System.out.println("Decrypting private table...");
@@ -114,18 +119,29 @@ public class ChatServer{
 				ObjectOutputStream outputStream=new ObjectOutputStream(clientSocket.getOutputStream());
 				outputStream.flush();
 				ObjectInputStream inputStream=new ObjectInputStream(clientSocket.getInputStream());
-				objectInPool.add(inputStream);
-				objectOutPool.add(outputStream);
-				Connection connection=new Connection(clientSocket,inputStream,outputStream);
+
+				Connection connection=new Connection(this,clientSocket,inputStream,outputStream);
+				synchronized(this){
+					connections.add(connection);
+				}
 				connection.start();
             }
 			
 		} catch (IOException e) {
 			System.out.println("An error has ocurred: "+e.getMessage());
 		}
+		
+		
+	}
+	
+	public static void main(String args[])
+   	{  	
+		ChatServer chatServer=new ChatServer();
+		chatServer.init(chatServer);
+		
    	}
 	
-	public static boolean serializeTable(){
+	public boolean serializeTable(){
 		
 		try{
 			File f = new File(TABLE_FILE);
@@ -148,7 +164,7 @@ public class ChatServer{
 		}
 		return true;
 	}
-	public static void unserializeTable(){
+	public void unserializeTable(){
 		
 		try{
 			File f = new File(TABLE_FILE);
@@ -169,7 +185,7 @@ public class ChatServer{
 			System.out.println("Could not unserialize the table. Created a new instead");
 		}
 	}
-	public static boolean encryptSerializedTable(){
+	public boolean encryptSerializedTable(){
 		
 		//In a real world application, we could use a smartcard as the source of the pass, this is a just a proof of concept
 		String smartcard="verysecurepassword";
@@ -190,12 +206,13 @@ public class ChatServer{
 		}
 		return true;
 	}
-	public static boolean decryptSerializedTable(){
+	public boolean decryptSerializedTable(){
 		
 		String smartcard="verysecurepassword";
 		try {
 			File f = new File(TABLE_FILE);
 			File fe = new File(ENCRYPTED_TABLE_FILE);
+
 			f.createNewFile();
 			fe.createNewFile();
 			
@@ -207,14 +224,14 @@ public class ChatServer{
 		}
 		return true;
 	}
-	public static void encrypt(String key, InputStream is, OutputStream os) throws Throwable {
+	public void encrypt(String key, InputStream is, OutputStream os) throws Throwable {
 		encryptOrDecrypt(key, Cipher.ENCRYPT_MODE, is, os);
 	}
 
-	public static void decrypt(String key, InputStream is, OutputStream os) throws Throwable {
+	public void decrypt(String key, InputStream is, OutputStream os) throws Throwable {
 		encryptOrDecrypt(key, Cipher.DECRYPT_MODE, is, os);
 	}
-	public static void encryptOrDecrypt(String key, int mode, InputStream is, OutputStream os) throws Throwable {
+	public void encryptOrDecrypt(String key, int mode, InputStream is, OutputStream os) throws Throwable {
 
 		DESKeySpec dks = new DESKeySpec(key.getBytes());
 		SecretKeyFactory skf = SecretKeyFactory.getInstance("DES");
@@ -232,7 +249,7 @@ public class ChatServer{
 		}
 	}
 
-	public static void doCopy(InputStream is, OutputStream os) throws IOException {
+	public void doCopy(InputStream is, OutputStream os) throws IOException {
 		byte[] bytes = new byte[64];
 		int numBytes;
 		while ((numBytes = is.read(bytes)) != -1) {
@@ -243,7 +260,8 @@ public class ChatServer{
 		is.close();
 	}
 	
-	static class Connection extends Thread {
+	class Connection extends Thread {
+		ChatServer server;
 		
 		public ObjectInputStream in;
 		public ObjectOutputStream out;
@@ -253,10 +271,11 @@ public class ChatServer{
 		public Record clientRecord=null;
 		public String username;
 		
-		public Connection (Socket clientSocket,ObjectInputStream in,ObjectOutputStream out){
+		public Connection (ChatServer server, Socket clientSocket,ObjectInputStream in,ObjectOutputStream out){
 			this.in=in;
 			this.out=out;
 			this.clientSocket=clientSocket;
+			this.server=server;
 	    }
 		
 		public void run(){
@@ -269,93 +288,33 @@ public class ChatServer{
 				for(Record record:table.getTable()){
 					if(record.getUsername().compareToIgnoreCase(username)==0){
 						clientRecord=record;
+						break;
 					}
 				}			
 				
-				if(clientRecord==null){	//new client
-					try{
-						syn.setMessage("NEW");
-						out.writeObject(syn);
-						out.reset();
-						
-						System.out.println("New client detected...\nInitiating the key agreement protocol with client: "+username);
-						System.out.println("Generating a Diffie-Hellman KeyPair with client: "+username);
-						KeyPairGenerator kpg = KeyPairGenerator.getInstance("DH");
-						kpg.initialize(PARAMETER_SPEC);
-					    KeyPair keyPair = kpg.genKeyPair();
-					    
-					    System.out.println("Sending the server public key to client: "+username);
-					    byte[] keyBytes = keyPair.getPublic().getEncoded();
-					    syn.setEncondedPublicKey(keyBytes);
-					    out.writeObject(syn);
-					    out.reset();
-					    
-					    System.out.println("Receiving client's public key: "+username);
-					    syn=(Message)in.readObject();
-					    keyBytes = syn.getEncondedPublicKey();
-					    KeyFactory kf = KeyFactory.getInstance("DH");
-					    X509EncodedKeySpec x509Spec = new X509EncodedKeySpec(keyBytes);
-					    PublicKey clientPublicKey = kf.generatePublic(x509Spec);
-					    
-					    System.out.println("Performing the KeyAgreement with client: "+username);
-					    KeyAgreement ka = KeyAgreement.getInstance("DH");
-					    ka.init(keyPair.getPrivate());
-					    ka.doPhase(clientPublicKey,true);
-					    
-					    System.out.println("Create and send the IVParameterSpec to the client: "+username);
-					    byte[] initializationVector = new byte[8];
-					    SecureRandom random = new SecureRandom();
-					    random.nextBytes(initializationVector);
-					    syn.setInitializationVector(initializationVector);
-					    out.writeObject(syn);
-					    out.reset();
-					    
-					    System.out.println("Creating a session key with client: "+username);
-					    byte[] sessionKeyBytes = ka.generateSecret();
-					    SecretKeyFactory skf = SecretKeyFactory.getInstance("TripleDES");
-					    DESedeKeySpec tripleDesSpec = new DESedeKeySpec(sessionKeyBytes);
-					    SecretKey sessionKey = skf.generateSecret(tripleDesSpec);
-					    
-					    System.out.println("Creating the CipherStreams to be used with client: "+username);
-					    
-					    Cipher decrypter = Cipher.getInstance("TripleDES/CFB8/NoPadding");
-					    Cipher encrypter = Cipher.getInstance("TripleDES/CFB8/NoPadding");
-					    
-					    IvParameterSpec spec = new IvParameterSpec(initializationVector);
-					    
-					    encrypter.init(Cipher.ENCRYPT_MODE, sessionKey, spec);
-					    decrypter.init(Cipher.DECRYPT_MODE, sessionKey, spec);
-					    
-					    cipherOut = new ObjectOutputStream(new CipherOutputStream(out, encrypter));
-					    cipherOut.flush();
-					    cipherIn = new ObjectInputStream(new CipherInputStream(in, decrypter));
-					    
-					    //add these channels to the list of known connections, must be synchronized
-					    synchronized(this) {
-					    	cipherInPool.add(cipherIn);
-						    cipherOutPool.add(cipherOut);
-						    objectInPool.add(in);
-						    objectOutPool.add(out);
-						    onlineUsers.add(username);
-					    }
-					    
-					    //add a new table entry for future connections
-					    SessionKey key=new SessionKey(initializationVector,sessionKey);
-					    Record record=new Record(username,key,System.currentTimeMillis());
-					    table.addRecord(record);
-					    
-					    //send a success message
-					    syn.setMessage("Successfully Established a Secure Connection with server");
-					    cipherOut.writeObject(syn);
-					    cipherOut.reset();
-					    cipherOut.flush();
-					    
-					    System.out.println("Successfully Established a Secure Connection with client: "+username);
-					}
-				    catch (GeneralSecurityException ex){
-				       System.out.println("An error has ocurred ...\nDetails: "+ex.getMessage());
-				       ex.printStackTrace();
-				    }
+				if(clientRecord==null || (clientRecord!=null && (System.currentTimeMillis()- clientRecord.getTimeStamp() > 80000) )){	//new client
+					System.out.println("Initiating the key agreement protocol with client: "+username);
+					syn.setMessage("NEW");
+					out.writeObject(syn);
+					out.reset();
+					
+					DiffieHellman df=new DiffieHellman();
+					df.createNewKey(username, false, in, out);
+					cipherIn=df.getCipherIn();
+					cipherOut=df.getCipherOut();
+					synchronized (server) {
+						if(clientRecord==null)
+							server.table.addRecord(df.getRecord());
+						else
+							server.table.updateRecord(df.getRecord());
+					}		    
+					//send a success message
+					syn.setMessage("Successfully Established a Secure Connection with server");
+					cipherOut.writeObject(syn);
+					cipherOut.reset();
+					cipherOut.flush();
+					
+					System.out.println("Successfully Established a Secure Connection with client: "+username);
 				}
 				else{//existing client
 					try{
@@ -365,18 +324,6 @@ public class ChatServer{
 						out.flush();
 						
 						System.out.println("Known client detected... "+username);
-						
-//						syn=(Message)in.readObject();
-//						if(syn.getMessage().compareToIgnoreCase("FAIL")==0){	//log and close invalid connection
-//							System.out.println("WARNING: client "+username+" attempted to login but failed!");
-//							clientSocket.close();
-						
-						//a ver se isto dá bode
-						
-//							return;
-//						}
-						
-						
 						System.out.println("Creating the CipherStreams to be used with client: "+username);
 						
 						byte[] initializationVector=clientRecord.getSessionKey().getSpecification();
@@ -393,15 +340,6 @@ public class ChatServer{
 					    cipherOut = new ObjectOutputStream(new CipherOutputStream(out, encrypter));
 					    cipherOut.flush();
 					    cipherIn = new ObjectInputStream(new CipherInputStream(in, decrypter));
-					    
-					    //add these channels to the list of known connections, must be synchronized
-					    synchronized(this) {
-					    	cipherInPool.add(cipherIn);
-						    cipherOutPool.add(cipherOut);
-						    objectInPool.add(in);
-						    objectOutPool.add(out);
-						    onlineUsers.add(username);
-					    }
 					    
 					    //send a success message
 					    syn.setMessage("Successfully Established a Secure Connection with server");
@@ -423,40 +361,126 @@ public class ChatServer{
 				Message message;
 				while(true){
 					message=(Message)cipherIn.readObject();
-					for(int i=0;i<cipherOutPool.size();i++){
-						ObjectOutputStream encryptedChannel=cipherOutPool.get(i);
-						if(DEBUG)System.out.println("Forwarding message to "+onlineUsers.get(i));
-						try{
-							if(onlineUsers.get(i).compareToIgnoreCase(message.getUsername())!=0){	//avoid ping-pong
-								encryptedChannel.writeObject(message);
-								encryptedChannel.reset();
-								encryptedChannel.flush();
+					System.out.println("Received message from "+  message.getUsername());
+					if(message.verifyIntegrity()){
+						for(int i=0;i<connections.size();i++){
+							Connection conn=connections.get(i);
+							ObjectOutputStream encryptedChannel=conn.cipherOut;
+							if(DEBUG)System.out.println("Forwarding message to "+conn.username);
+							try{
+								if(conn.username.compareToIgnoreCase(message.getUsername())!=0){	//avoid ping-pong
+									encryptedChannel.writeObject(message);
+									encryptedChannel.reset();
+									encryptedChannel.flush();
+								}
+							}
+							catch(IOException e){ //remove offline user
+								if(username==null) username="?";
+								System.out.println("Client "+username+" was disconnected. Details: "+ e.getMessage());
+								if(DEBUG)e.printStackTrace();
+								synchronized(this) {
+									connections.remove(i);
+								}
+								i--;
 							}
 						}
-						catch(IOException e){ //remove offline user
-							if(username==null) username="?";
-							System.out.println("Client "+username+" was disconnected. Details: "+ e.getMessage());
-							if(DEBUG)e.printStackTrace();
-							synchronized(this) {
-								cipherInPool.remove(i);
-							    cipherOutPool.remove(i);
-							    objectInPool.remove(i);
-							    objectOutPool.remove(i);
-							    onlineUsers.remove(i);
-							}
-							i--;
-						}
+					}
+					else{
+						//BORA FAZER UMA NOVA CHAVE
+						System.out.println("Establish new key with client");
+						break;
 					}
 				}
 			}
 			catch(IOException e){ //remove offline user
-				
+				System.out.println("Connections was closed");
+				if(DEBUG) e.printStackTrace();
+				synchronized(this) {
+					connections.remove(this);
+				}
 			}
 			catch (ClassNotFoundException e) {
 			}
 		}
 		
+	}
+	
+	class ExpirationChecker extends Thread{
+		private ChatServer server;
 		
-
+		ExpirationChecker(ChatServer server) {
+			this.server=server;
+			this.start();
+		}
+		
+		public void run(){
+			while(true){
+				try {
+					Thread.sleep(60000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				checkExpiration();
+				saveData();
+			}
+		}
+		
+		void saveData(){
+			System.out.println("Serializing private table...");
+			serializeTable();
+			System.out.println("Encrypting private table...");
+			encryptSerializedTable();
+		}
+		
+		void checkExpiration(){
+			for(Record rec:server.table.getTable() ){		
+				for(Connection conn:server.connections){
+					if(conn.username.compareTo(rec.getUsername())==0 && (System.currentTimeMillis()- rec.getTimeStamp() > 80000)){
+						Message mes=new Message("server","TIMEOUT");
+						mes.assureIntegrity();
+						try {
+							conn.cipherOut.writeObject(mes);
+							conn.cipherOut.reset();
+							conn.cipherOut.flush();
+						} catch (IOException e1) {
+							// TODO Auto-generated catch block
+							e1.printStackTrace();
+						}
+						break;
+						
+						
+						
+//						try {
+//							conn.cipherOut.writeObject(mes);
+//							conn.cipherOut.reset();
+//							conn.cipherOut.flush();
+//							
+//							System.out.println("Client "+conn.username+" key has expired. Creating new key for him");
+//
+//							DiffieHellman df=new DiffieHellman();
+//							df.createNewKey(conn.username, false, conn.in, conn.out);
+//							conn.cipherIn=df.getCipherIn();
+//							conn.cipherOut=df.getCipherOut();
+//							synchronized (server) {
+//								server.table.updateRecord(df.getRecord());
+//							}		    
+//							//send a success message
+//							mes.setMessage("Successfully Established a Secure Connection with server");
+//							conn.cipherOut.writeObject(mes);
+//							conn.cipherOut.reset();
+//							conn.cipherOut.flush();
+//							
+//							System.out.println("Successfully Established a Secure Connection with client: "+conn.username);
+//							
+//						} catch (IOException e) {
+//							// TODO Auto-generated catch block
+//							e.printStackTrace();
+//						}
+//						break;
+					}
+				}
+				
+			}
+		}
 	}
 }

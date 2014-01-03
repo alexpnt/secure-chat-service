@@ -1,4 +1,8 @@
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 /*
  * Representation of the message
@@ -10,6 +14,8 @@ public class Message implements Serializable{
 	private String message;
 	private byte[] encondedPublicKey;
 	private byte[] initializationVector;
+	private byte[] messageDigest;
+	private long timeStamp;	
 	
 	
 	public Message(String username, String message) {
@@ -43,6 +49,38 @@ public class Message implements Serializable{
 
 	public void setInitializationVector(byte[] initializationVector) {
 		this.initializationVector = initializationVector;
+	}
+
+	public long getTimeStamp() {
+		return timeStamp;
+	}
+
+	public void setTimeStamp(long timeStamp) {
+		this.timeStamp = timeStamp;
+	}
+	
+	public boolean verifyIntegrity(){
+        MessageDigest digest;
+		try {
+			digest = MessageDigest.getInstance("MD5");
+			if(	Arrays.equals( digest.digest((username+message).getBytes("UTF-8")), messageDigest) ){
+				return true;
+			}
+		} catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+	
+	public void assureIntegrity(){
+        MessageDigest digest;
+		try {
+			digest = MessageDigest.getInstance("MD5");
+			messageDigest=digest.digest((username+message).getBytes("UTF-8"));
+
+		} catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
 	}
 
 }
