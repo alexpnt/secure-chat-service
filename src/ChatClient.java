@@ -68,12 +68,25 @@ public class ChatClient{
 				    
 				    if(DEBUG)System.out.println("Notify received");
 			    }else if(msg.compareToIgnoreCase("TIMEOUT")!=0){
-				    m=new Message(username,msg);
+			    	
+			    	if(msg.compareToIgnoreCase("QUIT")==0){
+				    	m=new Message(username,"GUYS, I AM LEAVING!!");
+				    }else{
+				    	m=new Message(username,msg);
+				    }
+				    
 				    m.assureIntegrity();
 				    cipherOut.writeObject(m);
 				    cipherOut.reset();
 				    cipherOut.flush();
 				    System.out.println();
+				    
+				    if(msg.compareToIgnoreCase("QUIT")==0){
+				    	System.exit(0);
+				    }
+				    
+				    
+				    
 			    }
 			} catch (IOException e) {
 				System.out.println("Server is Down");
