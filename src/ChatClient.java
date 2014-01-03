@@ -67,7 +67,7 @@ public class ChatClient{
 					}
 				    
 				    if(DEBUG)System.out.println("Notify received");
-			    }else{
+			    }else if(msg.compareToIgnoreCase("TIMEOUT")!=0){
 				    m=new Message(username,msg);
 				    m.assureIntegrity();
 				    cipherOut.writeObject(m);
