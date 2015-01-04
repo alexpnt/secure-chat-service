@@ -15,7 +15,6 @@ Secure-Chat-Service
 In the root directory of the project type:
     mkdir bin
     javac src/*.java -d bin/
-    
 
 ####Usage:####
 **Running the server**:
